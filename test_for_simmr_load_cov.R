@@ -47,5 +47,14 @@ simmr_1 <- with(
   )
 )
 
-simmr_out = simmr_ffvb_cov(simmr_1)
+simmr_out = simmr_ffvb_cov(simmr_1,  ffvb_control = list(
+  n_output = 3600,
+  S = 100,
+  P = 9,
+  beta_1 = 0.9,
+  beta_2 = 0.9,
+  tau = 1000,
+  eps_0 = 0.05,
+  t_W = 50
+))
 

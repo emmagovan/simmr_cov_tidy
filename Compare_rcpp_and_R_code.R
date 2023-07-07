@@ -147,8 +147,8 @@ sigma_beta_zero <- matrix(c(rep(1, K * (n_covariates))),
                           ncol = K)
 
 n_isotopes <- ncol(mu_c)
-c_0 <- c(rep(0.001, n_isotopes)) #Change to 0.0001
-d_0 <- c(rep(0.001, n_isotopes))
+c_0 <- c(rep(0.01, n_isotopes)) #Change to 0.0001
+d_0 <- c(rep(0.01, n_isotopes))
 beta_lambda<-c(rep(0, K),rep(1, K * (K + 1) / 2))
 lambda <- c(
   rep(beta_lambda, n_covariates),
@@ -182,8 +182,6 @@ lambda_index <- lambda_extract(n_covariates, K, n_isotopes)
 
 
 # sim_theta ---------------------------------------------------------------
-
-
 sim_theta <- function(S = 100, lambda) {
   
   ## Create a loop instead to do this I think? Will need to make an array?
@@ -371,7 +369,7 @@ lambda_out <- run_VB(lambda)
 lambda_outrcpp <- run_VB_cpp(lambda, K, n_isotopes, n_covariates, n, 0.001, 
                              as.matrix(q), as.matrix(mu_s), as.matrix(mu_c), 
                              as.matrix(sigma_c), as.matrix(sigma_s), y, x_scaled,
-                             100, 10, 0.9, 0.9, 1000, 0.1, 50)
+                             100, 10, 0.5, 0.5, 1000, 0.01, 50)
 
 
 library(simmr)
