@@ -183,6 +183,9 @@ NumericMatrix sim_thetacpp(int S, NumericVector lambda, int n_sources,
   
   
   return theta;
+  // so this is K betas and then n_isotope taus 
+  // Tau is gamma distributed with shape and rate
+  // Need to check I'm using tau the whole way through and not sigma
 }
 
 //calculates p - which is exp(f) / sum exp(f)
@@ -308,14 +311,14 @@ double hcpp(int n_sources, int n_isotopes, int n_covariates,
   
   // Now do the same for sigma
   // 
-  NumericMatrix sigtop(n, n_isotopes);
-  NumericMatrix sigbtm(n, n_isotopes);
+  NumericMatrix sigsqtop(n, n_isotopes);
+  NumericMatrix sigsqbtm(n, n_isotopes);
   
   for(int j=0; j<n_isotopes; j++){
     for(int i=0; i<n; i++){
       for(int k=0; k<n_sources; k++){
-        sigtop(i,j) += pow(p(i,k) * concentrationmeans(k,j),2) * (pow(sourcesds(k,j),2) + pow(corrsds(k,j),2));
-        sigbtm(i,j) += pow(p(i,k)*concentrationmeans(k,j),2);
+        sigsqtop(i,j) += pow(p(i,k) * concentrationmeans(k,j),2) * (pow(sourcesds(k,j),2) + pow(corrsds(k,j),2));
+        sigsqbtm(i,j) += pow(p(i,k)*concentrationmeans(k,j),2);
       }
     }
   }
@@ -332,7 +335,9 @@ double hcpp(int n_sources, int n_isotopes, int n_covariates,
   
   for(int i=0; i<(n); i++){
     for(int j=0; j<n_isotopes; j++){
-      sigtotal(i,j) = pow(sigtop(i,j)/sigbtm(i,j) + pow(theta(j + n_sources*n_covariates),2), 0.5);
+      
+      // this is the sqrt of p^2 + q^2 etc + 1/tau
+      sigtotal(i,j) = pow((sigsqtop(i,j)/sigsqbtm(i,j) + 1/theta(j + n_sources*n_covariates)), 0.5);
     }
   }
   
@@ -435,11 +440,11 @@ double log_q_cpp(NumericVector theta, NumericVector lambda,
     }
   }
   
-  NumericVector sigma(n_tracers);
-  
-  for(int i=0; i<n_tracers; i++){
-    sigma(i) = theta(n_covariates*n_sources+i);
-  }
+  // NumericVector sigma(n_tracers);
+  // 
+  // for(int i=0; i<n_tracers; i++){
+  //   sigma(i) = theta(n_covariates*n_sources+i);
+  // }
   
   // NumericMatrix pmat(n_covariates, n_sources);
   // 
@@ -686,7 +691,7 @@ NumericVector nabla_LB_cpp(NumericVector lambda, NumericMatrix theta,
   
   
   for(int i = 0; i <thetanrow; i++){
-    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.01, n_sources, n_tracers,
+    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.001, n_sources, n_tracers,
                    n_covariates, S);
   }
   
@@ -779,7 +784,7 @@ NumericVector control_var_cpp(NumericVector lambda,
   NumericVector big_h_lambda_transpose(S);
   
   for(int i = 0; i <S; i++){
-    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.01, n_sources, n_tracers,
+    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.001, n_sources, n_tracers,
                    n_covariates, S);
   }
   
@@ -905,7 +910,7 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
   NumericMatrix theta(S, (n_sources + n_tracers));
   
   theta = sim_thetacpp(S, lambdastart, n_sources, n_tracers, n_covariates);
-  
+ // print(theta);
   NumericVector c(lsl);
   
   c = control_var_cpp(lambdastart, theta, n_sources, n_tracers, beta_prior, 
@@ -965,21 +970,26 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
   while(stop == FALSE){
     
     theta = sim_thetacpp(S, lambda, n_sources, n_tracers, n_covariates);
+   // Rcout << "The value of theta : " << theta << "\n";
     
     g_t = nabla_LB_cpp(lambda, theta, n_sources, n_tracers, beta_prior,
                        S, n_covariates, x_scaled, concentrationmeans,
                        sourcemeans, correctionmeans, corrsds, sourcesds,
                        y, c);
     
+    Rcout << "The value of gt : " << g_t << "\n";
+    
     c = control_var_cpp(lambda, theta,n_sources,n_tracers, beta_prior,
                         n_covariates, x_scaled,
                         concentrationmeans, sourcemeans,
                         correctionmeans,
                         corrsds,sourcesds, y);
+    Rcout << "The value of c : " << c << "\n";
     
     for(int i=0; i<lsl; i++){
       nu_t(i) = pow(g_t(i),2);
     }
+    Rcout << "The value of nu_t : " << nu_t << "\n";
     
     for(int i=0; i<lsl; i++){
       g_bar(i) = (beta_1 * g_bar(i)) + ((1-beta_1) * g_t(i));
@@ -994,6 +1004,7 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
     }
     
     alpha_t = Rcpp::min(alpha_min);
+    Rcout << "The value of alpha_t : " << alpha_t << "\n";
     
     
     
@@ -1001,7 +1012,15 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
     for(int i = 0; i<lsl; i++){
       //lambda(i) = lambda(i) + alpha_t * 1/pow(nu_bar(i), 0.5);
       lambda(i) = lambda(i) + alpha_t * (g_bar(i)/(pow(nu_bar(i), 0.5)));
+      
+      //Adding if statement to stop lambda dropping below 0 - not sure if this
+      // is 1. allowed 2. will mess up results 3. will result in it just converging
+      // on 0.001. Had it smaller but it broke it. Actually it just seems to break it
+      //full stop. Or - it means the issue isn't with lambda going below zero?
+      //if(lambda(lsl-1) < 0){lambda(lsl-1) = 0.001;}
     }
+    Rcout << "Iteration : " << t << "\n";
+    Rcout << "The value of lambda : " << lambda << "\n";
     
     
     //# Compute the moving average LB if out of warm-up
@@ -1031,6 +1050,8 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
          correctionmeans,
          corrsds,sourcesds, y);
       
+      Rcout << "The value of LB : " << LB << "\n";
+      
       
       double LB_bar = mean(LB);
       
@@ -1043,6 +1064,8 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
       
       max_LB_bar = Rcpp::max(maxbar);
       
+      Rcout << "The value of max_LB_bar : " << max_LB_bar << "\n";
+      
       if(LB_bar>= max_LB_bar){
         patience = 0;
       } else{
@@ -1050,6 +1073,7 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
       }
       
     }
+    Rcout << "The value of P : " << patience << "\n";
     
     //////////////////////
     if(patience>P){
@@ -1057,6 +1081,7 @@ NumericVector run_VB_cpp(NumericVector lambdastart,
     }
     t = t + 1;
   }
+
   
   return lambda;
 

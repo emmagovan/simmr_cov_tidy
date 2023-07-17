@@ -93,11 +93,15 @@ lambda2 <- c(1:32)
 n_sources <- K
 n_tracers = n_isotopes
 
+set.seed(17)
+theta<-sim_theta(S = 100, lambda)
+theta<-sim_thetacpp(S, lambda, n_sources, n_tracers, n_covariates)
+
 #-------------------
 #This works
-d_rcpp <- delta_lqltcpp(lambda, theta[1,], 0.01, n_sources, n_tracers, n_covariates, S)
+d_rcpp <- delta_lqltcpp(lambda, theta[1,], 0.001, n_sources, n_tracers, n_covariates, S)
 
-d_r <- delta_lqlt(lambda, theta[1,], 0.01)
+d_r <- delta_lqlt(lambda, theta[1,], 0.001)
 
 #--------h lambda
 #ALso agrees
@@ -133,6 +137,9 @@ nabla_LB_rcpp = nabla_LB_cpp(lambda,  theta,
 
 nabla_LB_r <- nabla_LB(lambda, theta, c = rep(0, length(lambda)))
 
+nabla_LB_rcpp == nabla_LB_r
+nabla_LB_rcpp-nabla_LB_r
+
 #These are not identical - biggest difference between any entry is 0.0007473353
 #Not sure if this is causing any issue
 #Probably rounding errors? Maybe
@@ -146,7 +153,10 @@ c_rcpp <- control_var_cpp(lambda, theta, n_sources, n_tracers,
   
 c_r = control_var(lambda, theta)  
   
-  #Same thing here - biggest difference is  0.0001922434
+c_rcpp == c_r
+c_rcpp - c_r
+
+#Same thing here - biggest difference is  0.0001922434
 
 
 #-------------------
@@ -180,8 +190,54 @@ lambda <- c(0.955376849,-1.555770607,-0.686713113,-0.806404492,
 lambda_outrcpp <- run_VB_cpp(lambda, K, n_isotopes, n_covariates, n, 0.001, 
                              as.matrix(q), as.matrix(mu_s), as.matrix(mu_c), 
                              as.matrix(sigma_c), as.matrix(sigma_s), y, x_scaled,
+                             100, 10, 0.9, 0.9, 100, 0.1, 50)
+
+lambda_outrcpp <- run_VB_cpp(lambda_outrcpp, K, n_isotopes, n_covariates, n, 0.001, 
+                             as.matrix(q), as.matrix(mu_s), as.matrix(mu_c), 
+                             as.matrix(sigma_c), as.matrix(sigma_s), y, x_scaled,
                              100, 10, 0.9, 0.9, 1000, 0.1, 50)
 
+lambda_1<- c(1.19896, -1.33635,
+               -0.101688,-0.329647,2.0731,0.314685,1.75994, 0.441738,
+               -0.310968, 1.89073, 2.20574, 0.611007, 0.462667, 2.0913,
+               2.19103, -0.0409074, 0.181668, 0.123159)
+
+lambda<-c(1.20408, -0.90427, -0.927247, 0.68516,
+          2.37201, -1.09613, 2.19287, 2.03324,
+          -1.14295, 2.27666, -0.0344194, -0.572259,
+          2.4752, 2.53957, 1.79256, 1.94713,
+          2.4916, 0.0249439)
+
+sim_theta(100, lambda_1)
+
+
+e<- function(lambda_outrcpp){
+  lambda_outrcpp <- run_VB_cpp_one_iter(lambda_outrcpp, K, n_isotopes, n_covariates, n, 0.001, 
+                               as.matrix(q), as.matrix(mu_s), as.matrix(mu_c), 
+                               as.matrix(sigma_c), as.matrix(sigma_s), y, x_scaled,
+                               100, 10, 0.9, 0.9, 1, 0.1, 50)
+  newList <- list("lambda" = lambda_outrcpp, 
+                  "theta" = sim_thetacpp(1, lambda_outrcpp, n_sources, n_isotopes, n_covariates))
+  print(newList)
+}
+
+for(i in 1:500){
+e(lambda_outrcpp)
+
+}
+
+# (lambdastart, n_sources, n_tracers, n_covariates, n, 
+#   beta_prior, concentrationmeans, sourcemeans, correctionmeans, 
+#   corrsds, sourcesds, y, x_scaled, S, P, beta_1, beta_2, tau, 
+#   eps_0, t_W) 
+
+#using this lambda sim_theta returns a weird estimate for theta_6
+#Same for sim_thetacpp
+#Its tiny??? Approaching zero - which is an issue since its a sigma
+#Possibly the issue is in sim theta??
+#Its the one function I cannot compare very well with R because its randomly generated
+#I did test it with different lambdas and it seemed to - in general - be approaching
+#the same answers if I looked at overall colMeans
 
 
 

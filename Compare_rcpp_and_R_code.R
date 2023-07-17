@@ -97,7 +97,7 @@ model{
   }   
   
   for(j in 1:J) { 
-      sigma[j] ~ dgamma(0.1, 0.1)
+      sigma[j] ~ dgamma(0.001, 0.001)
       }
 }
 "
@@ -147,8 +147,8 @@ sigma_beta_zero <- matrix(c(rep(1, K * (n_covariates))),
                           ncol = K)
 
 n_isotopes <- ncol(mu_c)
-c_0 <- c(rep(0.01, n_isotopes)) #Change to 0.0001
-d_0 <- c(rep(0.01, n_isotopes))
+c_0 <- c(rep(0.001, n_isotopes)) #Change to 0.0001
+d_0 <- c(rep(0.001, n_isotopes))
 beta_lambda<-c(rep(0, K),rep(1, K * (K + 1) / 2))
 lambda <- c(
   rep(beta_lambda, n_covariates),
@@ -156,6 +156,8 @@ lambda <- c(
   rep(1, n_isotopes) #rate
 )
 
+#alternate lambda to see if we can spot where issues are arising
+lambda <- c(0.955376849,-1.555770607,-0.686713113,-0.806404492,2.232814868,1.187747933,1.542799752,1.802486717,0.173387376,1.698359957,0.623842862,0.013428788,1.878521064,2.382494327,2.417136436,0.006784888,0.373499402,2.155241805)
   
   # function to extract lambdas --------------------------------------------
 lambda_extract <- function(n_covariates, K, n_isotopes){
@@ -240,7 +242,7 @@ theta_cpp <- sim_thetacpp(S, lambda, K, n_isotopes, n_covariates)
 h <- function(theta) {
   # Create betas and sigma
   beta <- matrix(theta[1:((n_covariates) * K)], nrow = (n_covariates), byrow = TRUE)
-  sigma <- theta[((n_covariates) * K +1):(((n_covariates) * K)+n_isotopes)]
+  tau <- theta[((n_covariates) * K +1):(((n_covariates) * K)+n_isotopes)]
   f <- matrix(NA, ncol = n, nrow = K) 
   
   #Need to double check that this maths is right!!
@@ -268,12 +270,12 @@ h <- function(theta) {
                                mean = sum(p[i, ] * q[, j] * (mu_s[, j] + mu_c[, j])) /
                                  sum(p[i, ] * q[, j]),
                                sd = sqrt(sum(p[i, ]^2 * q[, j]^2 * (sigma_s[, j]^2 + sigma_c[, j]^2)) /
-                                           sum(p[i, ]^2 * q[, j]^2) + sigma[j]^2),
+                                           sum(p[i, ]^2 * q[, j]^2) + 1/tau[j]),
                                log = TRUE
 
                       ))
       mumat[i,j] = sqrt(sum(p[i, ]^2 * q[, j]^2 * (sigma_s[, j]^2 + sigma_c[, j]^2)) /
-                          sum(p[i, ]^2 * q[, j]^2) + sigma[j]^2)
+                          sum(p[i, ]^2 * q[, j]^2) + 1/tau[j])
 
 
     }
@@ -285,7 +287,7 @@ h <- function(theta) {
     beta_sum = beta_sum +sum(dnorm(beta[i,], mu_beta_zero[i,], sigma_beta_zero[i,], log = TRUE))
   }
   
-  return(hold + beta_sum + sum(dgamma(sigma, shape = c_0, rate = d_0, log = TRUE)))
+  return(hold + beta_sum + sum(dgamma(tau, shape = c_0, rate = d_0, log = TRUE)))
 }
 h(theta[1,])
 hcpp(K, n_isotopes, n_covariates, 0.001, x_scaled, as.matrix(q), as.matrix(mu_s), 
@@ -323,12 +325,12 @@ log_q <- function(lambda, theta) {
   a<-array(NA, dim =c(S, K, (n_covariates)))
   thetabeta<-matrix(NA, ncol = (n_covariates) * K, nrow = S)
   
-  shape_sigma <- lambda[lambda_index$c]
-  rate_sigma <- lambda[lambda_index$d]
+  shape_tau <- lambda[lambda_index$c]
+  rate_tau <- lambda[lambda_index$d]
   
   # Extract alpha, beta and sigma from theta
   beta <- matrix(theta[1:((n_covariates) * K)], nrow = (n_covariates), ncol = K,  byrow = TRUE)
-  sigma <- theta[((n_covariates) * K +1):(((n_covariates) * K)+n_isotopes)]
+  tau <- theta[((n_covariates) * K +1):(((n_covariates) * K)+n_isotopes)]
   
   # This is a placeholder for more advanced code using chol_prec directly
   # prec <- crossprod(chol_prec)
@@ -348,9 +350,9 @@ log_q <- function(lambda, theta) {
     
   }
   
-    return(sum_p + sum(dgamma(sigma,
-                               shape = shape_sigma,
-                               rate = rate_sigma,
+    return(sum_p + sum(dgamma(tau,
+                               shape = shape_tau,
+                               rate = rate_tau,
                                log = TRUE
  ))
  )
@@ -369,7 +371,9 @@ lambda_out <- run_VB(lambda)
 lambda_outrcpp <- run_VB_cpp(lambda, K, n_isotopes, n_covariates, n, 0.001, 
                              as.matrix(q), as.matrix(mu_s), as.matrix(mu_c), 
                              as.matrix(sigma_c), as.matrix(sigma_s), y, x_scaled,
-                             100, 10, 0.5, 0.5, 1000, 0.01, 50)
+                             100, 10, 0.9, 0.9, 25, 0.1, 50)
+
+#lambda = lambda_outrcpp
 
 
 library(simmr)
@@ -408,17 +412,26 @@ sigma <- colMeans(theta_out[,(K*(n_covariates)+1):(K*(n_covariates)+n_isotopes)]
 beta_rcpp<-matrix(colMeans(theta_out_rcpp[,1:(K*(n_covariates))]), nrow = (n_covariates))
 sigma_rcpp<- colMeans(theta_out_rcpp[,(n_sources*(n_covariates)+1):(n_sources*(n_covariates)+n_isotopes)])
 
+f1_rcpp <- matrix(NA, ncol = K, nrow = n)
+
+for(k in 1:K){
+  f1_rcpp[,k] = x_scaled %*% beta_rcpp[,k]
+}
+p1_rcpp <- matrix(NA, ncol = K, nrow = n)
+
+for (i in 1:n) {
+  p1_rcpp[i, ] <- exp(f1_rcpp[i, 1:K]) / (sum((exp(f1_rcpp[i, 1:K]))))
+}
+
+print(p1_rcpp)
+
 f1 <- matrix(NA, ncol = K, nrow = n)
 
 for(k in 1:K){
   f1[,k] = x_scaled %*% beta[,k]
 }
 
-f1_rcpp <- matrix(NA, ncol = K, nrow = n)
 
-for(k in 1:K){
-  f1_rcpp[,k] = x_scaled %*% beta_rcpp[,k]
-}
 
 
 
@@ -428,9 +441,4 @@ for (i in 1:n) {
   p1[i, ] <- exp(f1[i, 1:K]) / (sum((exp(f1[i, 1:K]))))
 }
 
-p1_rcpp <- matrix(NA, ncol = K, nrow = n)
-
-for (i in 1:n) {
-  p1_rcpp[i, ] <- exp(f1_rcpp[i, 1:K]) / (sum((exp(f1_rcpp[i, 1:K]))))
-}
 
