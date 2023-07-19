@@ -283,7 +283,7 @@ double hcpp(int n_sources, int n_isotopes, int n_covariates,
   }
   
   for (int i = 0; i<n_isotopes; i++){
-    c_0(i) = 0.001;
+    c_0(i) = 0.1;
     d_0(i) = beta_prior;
   }
   
@@ -372,8 +372,8 @@ double hcpp(int n_sources, int n_isotopes, int n_covariates,
   
   for (int i=0; i<(n_isotopes); i++){
     gammaprior += c_0(i) * log(d_0(i)) - log(tgamma(c_0(i))) +
-      (c_0(i) - 1) * log(theta((i+n_sources*n_covariates)))-
-      d_0(i) * theta((i+n_sources*n_covariates));
+      (c_0(i) - 1) * log(theta(i+n_sources*n_covariates))-
+      d_0(i) * theta(i+n_sources*n_covariates);
     
   }
   // 
@@ -538,7 +538,7 @@ double log_q_cpp(NumericVector theta, NumericVector lambda,
     gamman += lambda(n_covariates * mat_size + n_covariates *n_sources +i) * 
       log(lambda(n_covariates * mat_size + n_covariates *n_sources +i + n_tracers))  -
       log(tgamma(lambda(n_covariates * mat_size + n_covariates *n_sources +i)))  +
-      (lambda(n_covariates * mat_size + n_covariates *n_sources +i) - 1) * log(theta((i+n_sources*n_covariates))) - 
+      (lambda(n_covariates * mat_size + n_covariates *n_sources +i) - 1) * log(theta(i+n_sources*n_covariates)) - 
       lambda(n_covariates * mat_size + n_covariates *n_sources +i + n_tracers) * theta((i+n_sources*n_covariates));
   }
   

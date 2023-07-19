@@ -686,7 +686,7 @@ NumericVector nabla_LB_cpp(NumericVector lambda, NumericMatrix theta,
   
   
   for(int i = 0; i <thetanrow; i++){
-    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.01, n_sources, n_tracers,
+    big_delta_lqlt(i,_) = delta_lqltcpp(lambda, theta(i,_), 0.001, n_sources, n_tracers,
                    n_covariates, S);
   }
   

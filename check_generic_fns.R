@@ -103,6 +103,7 @@ d_rcpp <- delta_lqltcpp(lambda, theta[1,], 0.001, n_sources, n_tracers, n_covari
 
 d_r <- delta_lqlt(lambda, theta[1,], 0.001)
 
+all.equal(d_rcpp, d_r)
 #--------h lambda
 #ALso agrees
 concentrationmeans = as.matrix(q)
@@ -113,20 +114,20 @@ sourcesds = as.matrix(sigma_s)
 beta_prior = 0.001
 
 
-h_l_cpp <- h_lambdacpp(n_sources, n_isotopes, 0.001, n_covariates, S, 
+h_l_cpp <- h_lambdacpp(n_sources, n_isotopes, 0.1, n_covariates, S, 
                      concentrationmeans, sourcemeans, correctionmeans, 
                      corrsds, sourcesds, 
                      theta[1,], y, lambda, x_scaled) 
 
 h_l <- h_lambda(lambda, theta[1,], y)
   
-  
+  all.equal(h_l_cpp, h_l[1,1])
   
 #---------------
 
  
 nabla_LB_rcpp = nabla_LB_cpp(lambda,  theta, 
-                            n_sources, n_tracers, beta_prior,
+                            n_sources, n_tracers, 0.1,
                             S,  n_covariates,
                             x_scaled,
                             concentrationmeans,  sourcemeans,
@@ -140,6 +141,8 @@ nabla_LB_r <- nabla_LB(lambda, theta, c = rep(0, length(lambda)))
 nabla_LB_rcpp == nabla_LB_r
 nabla_LB_rcpp-nabla_LB_r
 
+all.equal(nabla_LB_r, nabla_LB_rcpp)
+
 #These are not identical - biggest difference between any entry is 0.0007473353
 #Not sure if this is causing any issue
 #Probably rounding errors? Maybe
@@ -147,7 +150,7 @@ nabla_LB_rcpp-nabla_LB_r
 #------------------
 #control variate
 c_rcpp <- control_var_cpp(lambda, theta, n_sources, n_tracers,
-                          beta_prior,n_covariates, x_scaled, concentrationmeans,
+                          0.1, n_covariates, x_scaled, concentrationmeans,
                           sourcemeans, correctionmeans, corrsds,sourcesds,y)
 
   
@@ -156,13 +159,14 @@ c_r = control_var(lambda, theta)
 c_rcpp == c_r
 c_rcpp - c_r
 
+all.equal(c_rcpp, c_r)
 #Same thing here - biggest difference is  0.0001922434
 
 
 #-------------------
 LBlambda<- LB_lambda_cpp( theta,  lambda, 
                           hfn(theta, n_sources, n, n_covariates, x_scaled),  n_sources,  n_isotopes, 
-beta_prior,
+0.1,
  n_covariates,
   x_scaled,
   concentrationmeans,  sourcemeans,
@@ -172,7 +176,7 @@ beta_prior,
 
 LB_lambdar <- LB_lambda(lambda, theta) 
 
-
+all.equal(LBlambda, LB_lambdar)
 #Works
 
 #-----------------

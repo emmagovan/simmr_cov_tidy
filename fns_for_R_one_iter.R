@@ -98,7 +98,7 @@ h <- function(theta) {
     beta_sum = beta_sum +sum(dnorm(beta[i,], mu_beta_zero[i,], sigma_beta_zero[i,], log = TRUE))
   }
   
-  return(hold + beta_sum + sum(dgamma(tau, shape = c_0, rate = d_0, log = TRUE)))
+  return(hold + beta_sum + sum(dgamma(1/sqrt(tau), shape = c_0, rate = d_0, log = TRUE)))
 }
 
 # 
@@ -157,7 +157,7 @@ log_q <- function(lambda, theta) {
     
   }
   
-  return(sum_p + sum(dgamma(tau,
+  return(sum_p + sum(dgamma(1/sqrt(tau),
                             shape = shape_tau,
                             rate = rate_tau,
                             log = TRUE
@@ -231,7 +231,7 @@ delta_lqlt <- function(lambda, theta, eps = 0.001) {
 # Natural
 
 # Run the VB function
-run_VB <- function(lambda, # Starting value of lambda
+run_VB_one_iter <- function(lambda, # Starting value of lambda
                    S = 100, # Number of samples to take
                    P = 10, # Maximum patience before you stop
                    beta_1 = 0.9, # Learning rates
@@ -243,7 +243,7 @@ run_VB <- function(lambda, # Starting value of lambda
 ) {
   
   # Starting
-  set.seed(123)
+ # set.seed(12345)
   theta <- sim_theta(S, lambda)
   c <- control_var(lambda, theta)
   g_0 <- nabla_LB(lambda, theta)
@@ -263,6 +263,7 @@ run_VB <- function(lambda, # Starting value of lambda
   print("t")
   print(t)
   # Generate new samples
+ # set.seed(12345)
   theta <- sim_theta(S, lambda)
   
   # Compute g_t
@@ -325,3 +326,10 @@ rMVNormC <- function(n, mu, U){
   X <- sweep(X, 1, mu, FUN=`+`)
   return(X)
 }
+
+
+
+
+
+
+
